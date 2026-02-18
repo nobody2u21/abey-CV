@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Interactive Galaxy</title>
+<title>Ultra Realistic Galaxy</title>
 <style>
-body {
+html, body {
     margin: 0;
+    padding: 0;
     overflow: hidden;
-    background: radial-gradient(ellipse at bottom, #0b0f2a 0%, #000 100%);
+    background: #000;
 }
 canvas {
     display: block;
@@ -16,43 +17,44 @@ canvas {
 </style>
 </head>
 <body>
-<canvas id="galaxy"></canvas>
+<canvas id="space"></canvas>
 
 <script>
-const canvas = document.getElementById("galaxy");
+const canvas = document.getElementById("space");
 const ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-let centerX = canvas.width / 2;
-let centerY = canvas.height / 2;
-
-let mouseX = centerX;
-let mouseY = centerY;
-
-window.addEventListener("resize", () => {
+function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    centerX = canvas.width / 2;
-    centerY = canvas.height / 2;
-});
+}
+resize();
+window.addEventListener("resize", resize);
 
-window.addEventListener("mousemove", (e) => {
+let mouseX = canvas.width / 2;
+let mouseY = canvas.height / 2;
+
+window.addEventListener("mousemove", e => {
     mouseX = e.clientX;
     mouseY = e.clientY;
 });
 
+const center = () => ({
+    x: canvas.width / 2,
+    y: canvas.height / 2
+});
+
+// ---------- STAR CLASS (MILKY WAY ARMS) ----------
 class Star {
-    constructor() {
+    constructor(layer) {
+        this.layer = layer;
         this.reset();
     }
 
     reset() {
-        this.radius = Math.random() * 400;
+        this.distance = Math.random() * canvas.width * 0.6;
         this.angle = Math.random() * Math.PI * 2;
-        this.size = Math.random() * 2;
-        this.speed = this.radius * 0.00005;
+        this.size = Math.random() * (2 - this.layer * 0.5);
+        this.speed = 0.0003 * (1 - this.layer * 0.3);
     }
 
     update() {
@@ -60,16 +62,22 @@ class Star {
     }
 
     draw() {
-        const spiralFactor = 0.5;
-        const x = centerX + (mouseX - centerX) * 0.05 +
-            Math.cos(this.angle + this.radius * spiralFactor * 0.01) * this.radius;
-        const y = centerY + (mouseY - centerY) * 0.05 +
-            Math.sin(this.angle + this.radius * spiralFactor * 0.01) * this.radius;
+        const c = center();
 
-        const gradient = ctx.createRadialGradient(x, y, 0, x, y, this.size * 4);
+        const spiralTightness = 0.3;
+        const armOffset = Math.sin(this.angle * 2) * 0.5;
+        const spiralAngle = this.angle + this.distance * spiralTightness * 0.001 + armOffset;
+
+        const depthShiftX = (mouseX - c.x) * (0.02 * this.layer);
+        const depthShiftY = (mouseY - c.y) * (0.02 * this.layer);
+
+        const x = c.x + Math.cos(spiralAngle) * this.distance + depthShiftX;
+        const y = c.y + Math.sin(spiralAngle) * this.distance + depthShiftY;
+
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, this.size * 5);
         gradient.addColorStop(0, "white");
-        gradient.addColorStop(0.3, "rgba(173,216,230,0.8)");
-        gradient.addColorStop(0.6, "rgba(138,43,226,0.6)");
+        gradient.addColorStop(0.4, "rgba(173,216,230,0.8)");
+        gradient.addColorStop(0.7, "rgba(138,43,226,0.6)");
         gradient.addColorStop(1, "rgba(255,20,147,0)");
 
         ctx.fillStyle = gradient;
@@ -79,6 +87,37 @@ class Star {
     }
 }
 
+// ---------- PLANETS ----------
+class Planet {
+    constructor(radius, orbit, speed, color) {
+        this.radius = radius;
+        this.orbit = orbit;
+        this.speed = speed;
+        this.angle = Math.random() * Math.PI * 2;
+        this.color = color;
+    }
+
+    update() {
+        this.angle += this.speed;
+    }
+
+    draw() {
+        const c = center();
+        const x = c.x + Math.cos(this.angle) * this.orbit;
+        const y = c.y + Math.sin(this.angle) * this.orbit;
+
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, this.radius * 2);
+        gradient.addColorStop(0, "white");
+        gradient.addColorStop(1, this.color);
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// ---------- SHOOTING STARS ----------
 class ShootingStar {
     constructor() {
         this.reset();
@@ -87,8 +126,8 @@ class ShootingStar {
     reset() {
         this.x = Math.random() * canvas.width;
         this.y = 0;
-        this.length = Math.random() * 80 + 50;
-        this.speed = Math.random() * 8 + 6;
+        this.length = Math.random() * 120 + 80;
+        this.speed = Math.random() * 10 + 8;
         this.opacity = 1;
     }
 
@@ -109,27 +148,40 @@ class ShootingStar {
     }
 }
 
+// ---------- CREATE OBJECTS ----------
 const stars = [];
-for (let i = 0; i < 2000; i++) {
-    stars.push(new Star());
+const layers = 3;
+for (let l = 1; l <= layers; l++) {
+    for (let i = 0; i < 1000; i++) {
+        stars.push(new Star(l));
+    }
 }
 
+const planets = [
+    new Planet(8, 150, 0.01, "rgba(0,191,255,0.7)"),
+    new Planet(12, 250, 0.006, "rgba(138,43,226,0.7)"),
+    new Planet(6, 320, 0.014, "rgba(255,105,180,0.7)")
+];
+
 const shootingStars = [];
-for (let i = 0; i < 3; i++) {
+for (let i = 0; i < 4; i++) {
     shootingStars.push(new ShootingStar());
 }
 
+// ---------- NEBULA CORE ----------
 function drawNebula() {
-    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 500);
-    gradient.addColorStop(0, "rgba(255,105,180,0.3)");
-    gradient.addColorStop(0.4, "rgba(138,43,226,0.2)");
-    gradient.addColorStop(0.7, "rgba(30,144,255,0.1)");
+    const c = center();
+    const gradient = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 600);
+    gradient.addColorStop(0, "rgba(255,105,180,0.4)");
+    gradient.addColorStop(0.3, "rgba(138,43,226,0.3)");
+    gradient.addColorStop(0.6, "rgba(30,144,255,0.2)");
     gradient.addColorStop(1, "transparent");
 
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
+// ---------- ANIMATION LOOP ----------
 function animate() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -140,9 +192,14 @@ function animate() {
         star.draw();
     });
 
-    shootingStars.forEach(star => {
-        star.update();
-        star.draw();
+    planets.forEach(planet => {
+        planet.update();
+        planet.draw();
+    });
+
+    shootingStars.forEach(s => {
+        s.update();
+        s.draw();
     });
 
     requestAnimationFrame(animate);
